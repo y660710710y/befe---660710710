@@ -62,6 +62,15 @@ func initDB() {
 	log.Println("successfully connect to database")
 }
 
+func getHealth(c *gin.Context) {
+	err := db.Ping()
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"message": "Unhealthy", "error": err})
+		return
+	}
+	c.JSON(200, gin.H{"message": "healthy"})
+}
+
 // @Summary Get all book
 // @Description Get details of a books
 // @Tags Books
@@ -100,6 +109,57 @@ func getAllBooks(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, books)
+}
+
+// @Summary     Get new books
+// @Description Get latest books ordered by created date
+// @Tags        Books
+// @Accept      json
+// @Produce     json
+// @Param       limit  query    int  false  "Number of books to return (default 5)"
+// @Success     200   {array}   Book
+// @Failure     500   {object}  ErrorResponse
+// @Router      /books/new [get]
+func getNewBooks(c *gin.Context) {
+
+    rows, err := db.Query(`
+        SELECT id, title, author, isbn, year, price, created_at, updated_at 
+        FROM books 
+        ORDER BY created_at DESC 
+        LIMIT 5
+    `)
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    defer rows.Close()
+
+    var books []Book
+    for rows.Next() {
+        var book Book
+        err := rows.Scan(
+            &book.ID, 
+            &book.Title, 
+            &book.Author, 
+            &book.ISBN, 
+            &book.Year, 
+            &book.Price, 
+            &book.CreatedAt, 
+            &book.UpdatedAt,
+        )
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+        books = append(books, book)
+    }
+
+    if books == nil {
+        books = []Book{}
+    }
+
+    c.JSON(http.StatusOK, books)
 }
 
 // @Summary Get book by ID
@@ -249,23 +309,19 @@ func main() {
 	initDB()
 	defer db.Close()
 	r := gin.Default()
-	r.Use(cors.Default())
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	r.Use(cors.New(config))
 
 	// Swagger endpoint
 	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	r.GET("/health", func(c *gin.Context) {
-		err := db.Ping()
-		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"message": "unhealthy", "error": err})
-			return
-		}
-		c.JSON(200, gin.H{"message": "healthy"})
-	})
+	r.GET("/health", getHealth)
 
 	api := r.Group("/api/v1")
 	{
 		api.GET("/books", getAllBooks)
+		api.GET("/books/new", getNewBooks) 
 		api.GET("/books/:id", getBook)
 		api.POST("/books", createBook)
 		api.PUT("/books/:id", updateBook)
