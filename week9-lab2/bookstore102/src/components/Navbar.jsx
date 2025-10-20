@@ -17,7 +17,7 @@ const Navbar = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3 group">
             <div className="h-10 w-10 bg-viridian-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-              <span className="text-white font-bold text-xl">B</span>
+              <span className="text-black font-bold text-xl">B</span>
             </div>
             <span className="text-2xl font-bold text-viridian-600 group-hover:text-viridian-700 transition-colors">
               BookStore
